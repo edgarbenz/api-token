@@ -12,9 +12,12 @@ const jwt = require('jsonwebtoken'); //* Importacion del modulo externo jsonwebt
 //*
 //* // Datos que quieres incluir en el token
 //* const payload = { id: 1, usuario: 'admin' };
+//* Lo ideal es no meter datos sensibles aquí, solo lo mínimo necesario.
 //*
 //* // Crear un token con expiración de 1 hora
 //* const token = jwt.sign(payload, secretKey, { expiresIn: '1h' });
+//* //* { expiresIn: '15m' } Define que el token expira en 15 minutos. 
+// * → Después de ese tiempo, el cliente necesitará un refresh token o volver a iniciar sesión.
 //* console.log('Token generado:', token);
 //*
 //* // Verificar y decodificar el token
@@ -91,37 +94,35 @@ app.use(express.json());
 const userDB = {
   email: 'test@demo.com',
   passwordHash: bcrypt.hashSync('123456', 10) //el password 123456 se guarda pero encriptado
-};
+};//* sE RECOMIENDA NO PASAR PASSWORDS , SOLO USER O EMAIL
 
-// 🔹 Almacenamiento temporal de refresh tokens (en producción usar DB)
+//* 🔹 Almacenamiento temporal de refresh tokens (en producción usar DB)
 let refreshTokens = [];
 
-// Función para generar tokens
+//* Función para generar tokens
 function generateAccessToken(user) {
-  return jwt.sign(user, ACCESS_TOKEN_SECRET, { expiresIn: '15m' }); // 15 minutos
-} // regresa un token JKT codificado en Base64: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9
-// .eyJlbWFpbCI6InRlc3RAZGVtby5jb20iLCJpYXQiOjE3MzU5MjM2MDAsImV4cCI6MTczNTkyNDUwMH0
-// .qd9Xz7lq2QkYw0vXzXzY7Qh7oX9vWmZsQk9lYzZkY2U
-// contiene esto: 
-// {
-//   email: "test@demo.com",
-//   iat: 1735923600,   // Tiempo exacto en que fue creado
-//   exp: 1735924500    // expiration (timestamp)
-// }
+  return jwt.sign(user, ACCESS_TOKEN_SECRET, { expiresIn: '15m' }); //* Crea un JSON Web Token
+} //* jwt.sign(...) Es la función de la librería jsonwebtoken que crea un JSON Web Token.
+//* user Es el payload del token, normalmente un objeto con información del usuario (ej. id, username, role). ⚠️ Lo ideal es no meter datos sensibles aquí, solo lo mínimo necesario.
+//* ACCESS_TOKEN_SECRET Es la clave secreta que usas para firmar el token. → Solo el servidor debe conocerla, porque garantiza que el token no pueda ser falsificado.
+//* { expiresIn: '15m' } Define que el token expira en 15 minutos. → Después de ese tiempo, el cliente necesitará un refresh token o volver a iniciar sesión.
 
 function generateRefreshToken(user) {
   const refreshToken = jwt.sign(user, REFRESH_TOKEN_SECRET, { expiresIn: '7d' }); // 7 días
-  refreshTokens.push(refreshToken); // en produccion usar BD
+  refreshTokens.push(refreshToken); //* Guarda el refresh token en un arreglo en memoria (refreshTokens).
+//*Esto sirve para llevar un control de los tokens válidos.
+//*⚠️ En producción lo recomendable es usar una base de datos para poder invalidar tokens cuando el usuario cierre sesión o se detecte actividad sospechosa.
   return refreshToken;
-} // Genera un token igual que el de arriba pero de larga duracion
-// Es un token de larga duración que sirve para pedir nuevos access tokens sin que el usuario tenga que volver a iniciar sesión.
-// Se usa cuando el access token (que dura poco, en tu caso 15 minutos) expira y el usuario sigue legeado.
-// El refresh token se envía al servidor en la ruta /token, y si es válido, el servidor genera un nuevo access token.
-// 🚀 Conclusión
-// El refresh token NO se genera automáticamente cada vez que expira el access token.
-// Se genera solo en el login.
-// Mientras el usuario esté conectado y tenga un refresh token válido, puede seguir renovando su access token.
-// Si se desconecta (logout) o el refresh token expira, ya no podrá renovar y tendrá que iniciar sesión de nuevo.
+} //* Usa la librería jsonwebtoken (jwt.sign) para firmar un token.
+//* El payload es el objeto user (ej. { id: 123, email: "test@demo.com" }).
+//* Se firma con la clave secreta REFRESH_TOKEN_SECRET.
+//* Tiene una expiración de 7 días.
+
+//* 🚀 Conclusión
+//* El refresh token NO se genera automáticamente cada vez que expira el access token.
+//* Se genera solo en el login.
+//* Mientras el usuario esté conectado y tenga un refresh token válido, puede seguir renovando su access token.
+//* Si se desconecta (logout) o el refresh token expira, ya no podrá renovar y tendrá que iniciar sesión de nuevo.
 
 //Regresa el accessToken de 15 min y el Refresh Token de 7 dias en formato JSON
 app.post('/login', (req, res) => {
