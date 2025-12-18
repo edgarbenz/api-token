@@ -124,40 +124,54 @@ function generateRefreshToken(user) {
 //* Mientras el usuario esté conectado y tenga un refresh token válido, puede seguir renovando su access token.
 //* Si se desconecta (logout) o el refresh token expira, ya no podrá renovar y tendrá que iniciar sesión de nuevo.
 
-//Regresa el accessToken de 15 min y el Refresh Token de 7 dias en formato JSON
+//* Ruta del Login
 app.post('/login', (req, res) => {
-  const { email, password } = req.body; // recibe las credenciales del cliente con las que se logeo desde la app
+  const { email, password } = req.body; //* recibe las credenciales del cliente con las que se logeo desde la app
 
-  // Primero checa si el email o password no existe responde con un 400 Bad Request
+  //* Primero checa si el email o password no existe responde con un 400 Bad Request
   if (!email || !password) return res.status(400).json({ error: 'Email y contraseña requeridos' });
 
-  // Si el email no coincide con ninguno de la BD responde con 401 Usuario No Encontrado
+  //* Si el email no coincide con ninguno de la BD responde con 401 Usuario No Encontrado
   if (email !== userDB.email) return res.status(401).json({ error: 'Usuario no encontrado' });
 
-  //compareSync es como un IF checa el password de texto del cliente contra los password encriptados validos de la BD
+  //*compareSync es como un IF checa el password de texto del cliente contra los password encriptados validos de la BD
   const validPassword = bcrypt.compareSync(password, userDB.passwordHash);
   if (!validPassword) return res.status(401).json({ error: 'Contraseña incorrecta' });
 
   const user = { email };
-  // esa es una abreviatura de :
-  // const user = {
-  //   email: email
-  // };
+  //* esa es una abreviatura de :
+  //* const user = {
+  //*   email: email
+  //* };
   const accessToken = generateAccessToken(user);
   const refreshToken = generateRefreshToken(user);
 
   res.json({ accessToken, refreshToken });
-});
+});//* Regresa el accessToken y refreshToken al cliente si las credenciales son correctas
 
-// *VOY AQUI
-// 🔹 Ruta para renovar access token
-app.post('/token', (req, res) => {
-  const { token } = req.body;
-  if (!token) return res.status(401).json({ error: 'Refresh token requerido' });
+//* VOY AQUI
+// 🔹 Ruta para renovar access token apartir de un refresh token  7  
+
+//* El endpoint /token permite que el cliente obtenga un nuevo access token sin necesidad de volver a iniciar sesión, siempre que tenga un refresh token válido.
+app.post('/token', (req, res) => { //* Esta función define un endpoint POST en Express (/token) 
+//* que sirve para generar un nuevo access token A PARTIR DE UN refresh token. 
+  const { token } = req.body; //* 1. Recepción del refresh token
+                              //* Se espera que el cliente envíe un objeto JSON en el cuerpo
+                              //*  de la petición con la propiedad token.
+                              //* Ejemplo:
+                              //* Con un json asi:   { "token": "refreshTokenEjemplo123" }
   if (!refreshTokens.includes(token)) return res.status(403).json({ error: 'Refresh token inválido' });
-
+                              //* 2. Validación inicial
+                              //* Si no se envía ningún token → responde con 401 Unauthorized:
+                              //* Con un json asi:   { "error": "Refresh token requerido" }
   jwt.verify(token, REFRESH_TOKEN_SECRET, (err, user) => {
     if (err) return res.status(403).json({ error: 'Refresh token expirado o inválido' });
+                              //* Si el token no está en la lista refreshTokens 
+                              //* (es decir, no fue emitido previamente o ya fue invalidado) → 
+                              //* responde con 403 Forbidden:
+                              //* Con un json asi:
+                              //* { "error": "Refresh token inválido" }
+
     const accessToken = generateAccessToken({ email: user.email });
     res.json({ accessToken });
   });
